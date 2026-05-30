@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ING TapPay — Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 16px 60px;
+    overflow-x: hidden;
+  }
+  h1 { font-size: 28px; margin-bottom: 4px; letter-spacing: -0.5px; }
+  h1 .orange { color: #ff6200; }
+  .subtitle { color: #9aa5c4; font-size: 15px; margin-bottom: 28px; text-align: center; }
+
+  .stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 80px;
+    transition: gap 0.9s cubic-bezier(.6,-0.2,.3,1.4);
+    margin-bottom: 10px;
+  }
+  .stage.tapped { gap: 6px; }
+
+  /* Phone */
+  .phone {
+    width: 230px;
+    height: 460px;
+    background: #0d0d18;
+    border-radius: 34px;
+    border: 6px solid #2b2f45;
+    padding: 16px 14px;
+    position: relative;
+    box-shadow: 0 25px 50px rgba(0,0,0,.5);
+    transition: transform 0.9s cubic-bezier(.6,-0.2,.3,1.4), box-shadow .4s;
+    display: flex;
+    flex-direction: column;
+  }
+  .stage.tapped .phone.left  { transform: translateX(14px) rotate(-1.5deg); }
+  .stage.tapped .phone.right { transform: translateX(-14px) rotate(1.5deg); }
+  .phone.glow { box-shadow: 0 0 0 3px #ff6200, 0 0 40px #ff6200aa, 0 25px 50px rgba(0,0,0,.5); }
+
+  .notch { width: 90px; height: 18px; background: #2b2f45; border-radius: 0 0 12px 12px; margin: -16px auto 12px; }
+  .os-tag {
+    position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
+    background: #2b2f45; color: #9aa5c4; white-space: nowrap;
+  }
+
+  .screen-title { font-size: 13px; color: #9aa5c4; margin-bottom: 2px; }
+  .name { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .iban { font-size: 11px; color: #6b7494; font-family: monospace; margin-bottom: 18px; }
+
+  .balance-box {
+    background: linear-gradient(135deg, #ff6200, #ff8534);
+    border-radius: 16px; padding: 14px; margin-bottom: 16px;
+  }
+  .balance-label { font-size: 11px; opacity: .9; }
+  .balance-amount { font-size: 26px; font-weight: 800; transition: color .3s; }
+  .balance-amount.flash-up { color: #d4ffd4; }
+  .balance-amount.flash-down { color: #ffe0e0; }
+
+  .amount-input {
+    width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #2b2f45;
+    background: #15162a; color: #fff; font-size: 22px; font-weight: 700; text-align: center;
+    margin-bottom: 12px;
+  }
+  .amount-input:focus { outline: none; border-color: #ff6200; }
+
+  .status {
+    margin-top: auto; font-size: 13px; text-align: center; min-height: 40px;
+    display: flex; align-items: center; justify-content: center; padding: 8px;
+    border-radius: 12px; background: #15162a; color: #9aa5c4;
+    transition: all .3s;
+  }
+  .status.success { background: #103a1e; color: #6effa0; font-weight: 700; }
+  .status.receiving { background: #3a2e10; color: #ffd56e; }
+
+  /* NFC waves in the middle */
+  .nfc-zone {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 120px; height: 120px; pointer-events: none; opacity: 0;
+    transition: opacity .3s;
+  }
+  .nfc-zone.active { opacity: 1; }
+  .wave {
+    position: absolute; left: 50%; top: 50%; border: 3px solid #ff6200;
+    border-radius: 50%; transform: translate(-50%,-50%);
+    animation: ripple 1.4s ease-out infinite;
+  }
+  .wave:nth-child(2) { animation-delay: .45s; }
+  .wave:nth-child(3) { animation-delay: .9s; }
+  @keyframes ripple {
+    0%   { width: 10px; height: 10px; opacity: 1; }
+    100% { width: 130px; height: 130px; opacity: 0; }
+  }
+
+  /* Flying money coin */
+  .coin {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) scale(0);
+    width: 46px; height: 46px; background: linear-gradient(135deg,#ffd34d,#ff9d00);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800; color: #7a4a00; box-shadow: 0 6px 16px rgba(0,0,0,.4);
+    opacity: 0; z-index: 5;
+  }
+  .coin.fly { animation: fly 1.1s ease-in forwards; }
+  @keyframes fly {
+    0%   { transform: translate(-130px,-50%) scale(0);   opacity: 0; }
+    20%  { transform: translate(-110px,-50%) scale(1);   opacity: 1; }
+    80%  { transform: translate(110px,-50%) scale(1);    opacity: 1; }
+    100% { transform: translate(130px,-50%) scale(0);    opacity: 0; }
+  }
+
+  .controls { margin-top: 40px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  button.action {
+    background: #ff6200; color: #fff; border: none; padding: 16px 34px;
+    border-radius: 14px; font-size: 17px; font-weight: 700; cursor: pointer;
+    transition: transform .15s, background .2s; box-shadow: 0 8px 20px rgba(255,98,0,.4);
+  }
+  button.action:hover:not(:disabled) { transform: translateY(-2px); background: #ff7a26; }
+  button.action:disabled { background: #3a3f55; box-shadow: none; cursor: not-allowed; }
+  button.reset {
+    background: transparent; color: #9aa5c4; border: 2px solid #2b2f45;
+    padding: 16px 24px; border-radius: 14px; font-size: 15px; cursor: pointer;
+  }
+  button.reset:hover { border-color: #9aa5c4; color: #fff; }
+
+  .explain {
+    margin-top: 34px; max-width: 560px; background: #ffffff0d; border: 1px solid #ffffff1a;
+    border-radius: 16px; padding: 18px 22px; font-size: 14px; line-height: 1.6; color: #c8d0e8;
+  }
+  .explain b { color: #ff8534; }
+  .explain .step { opacity: .35; transition: opacity .4s; }
+  .explain .step.on { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1><span class="orange">ING</span> TapPay <span style="font-size:18px">📲💸</span></h1>
+  <p class="subtitle">Demo — twee telefoons tegen elkaar = geld overschrijven (iPhone &amp; Android)</p>
+
+  <div class="stage" id="stage">
+    <!-- Sender -->
+    <div class="phone left" id="phoneLeft">
+      <span class="os-tag">📱 iPhone — Verzender</span>
+      <div class="notch"></div>
+      <div class="screen-title">ING TapPay</div>
+      <div class="name">Arpit</div>
+      <div class="iban">BE68 5390 0754 7034</div>
+      <div class="balance-box">
+        <div class="balance-label">Saldo</div>
+        <div class="balance-amount" id="balLeft">€ 1.250,00</div>
+      </div>
+      <input class="amount-input" id="amount" type="number" value="25" min="1">
+      <div class="status" id="statusLeft">Vul een bedrag in en tik de telefoons tegen elkaar</div>
+    </div>
+
+    <!-- NFC waves + coin -->
+    <div class="nfc-zone" id="nfc">
+      <div class="wave"></div><div class="wave"></div><div class="wave"></div>
+    </div>
+    <div class="coin" id="coin">€</div>
+
+    <!-- Receiver -->
+    <div class="phone right" id="phoneRight">
+      <span class="os-tag">🤖 Android — Ontvanger</span>
+      <div class="notch"></div>
+      <div class="screen-title">ING TapPay</div>
+      <div class="name">Sofie</div>
+      <div class="iban">BE71 0961 2345 6769</div>
+      <div class="balance-box">
+        <div class="balance-label">Saldo</div>
+        <div class="balance-amount" id="balRight">€ 480,00</div>
+      </div>
+      <div style="font-size:11px;color:#6b7494;margin-bottom:18px">Klaar om te ontvangen via NFC / QR…</div>
+      <div class="status" id="statusRight">Wachten op een tik…</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="action" id="tapBtn" onclick="tap()">👉 Tik telefoons tegen elkaar</button>
+    <button class="reset" onclick="resetDemo()">↺ Opnieuw</button>
+  </div>
+
+  <div class="explain">
+    <div class="step" id="s1">1️⃣ Telefoons komen dichtbij → <b>NFC / QR</b> maakt verbinding.</div>
+    <div class="step" id="s2">2️⃣ De ontvanger deelt enkel zijn <b>rekeningnummer (IBAN)</b> — géén geld.</div>
+    <div class="step" id="s3">3️⃣ Jij bevestigt het bedrag met <b>vingerafdruk / gezicht</b>.</div>
+    <div class="step" id="s4">4️⃣ <b>ING</b> regelt de échte overschrijving via de beveiligde bankverbinding. ✅</div>
+  </div>
+
+<script>
+  let busy = false;
+  const left = 1250, right = 480;
+  let balLeft = left, balRight = right;
+
+  const euro = n => "€ " + n.toLocaleString("nl-BE", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  function setStep(id, on) { document.getElementById(id).classList.toggle("on", on); }
+  function wait(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  async function tap() {
+    if (busy) return;
+    const amount = parseFloat(document.getElementById("amount").value);
+    if (!amount || amount <= 0) { alert("Vul een geldig bedrag in 🙂"); return; }
+    if (amount > balLeft) { alert("Niet genoeg saldo 😅"); return; }
+    busy = true;
+    document.getElementById("tapBtn").disabled = true;
+    ["s1","s2","s3","s4"].forEach(s => setStep(s, false));
+
+    // 1. Phones move together
+    document.getElementById("stage").classList.add("tapped");
+    document.getElementById("phoneLeft").classList.add("glow");
+    document.getElementById("phoneRight").classList.add("glow");
+    await wait(600);
+
+    // 2. NFC connection
+    document.getElementById("nfc").classList.add("active");
+    setStep("s1", true);
+    document.getElementById("statusLeft").textContent = "🔗 Verbinding maken via NFC…";
+    document.getElementById("statusRight").className = "status receiving";
+    document.getElementById("statusRight").textContent = "🔗 Telefoon gedetecteerd…";
+    await wait(1200);
+
+    // 3. Share IBAN
+    setStep("s2", true);
+    document.getElementById("statusLeft").textContent = "📥 Rekeningnummer ontvangen van Sofie";
+    document.getElementById("statusRight").textContent = "📤 IBAN gedeeld (geen geld!)";
+    await wait(1300);
+
+    // 4. Confirm
+    setStep("s3", true);
+    document.getElementById("statusLeft").textContent = "👆 Bevestig met vingerafdruk…";
+    await wait(1300);
+
+    // 5. ING processes — coin flies
+    setStep("s4", true);
+    document.getElementById("nfc").classList.remove("active");
+    document.getElementById("statusLeft").textContent = "🏦 ING verwerkt de overschrijving…";
+    const coin = document.getElementById("coin");
+    coin.classList.add("fly");
+    await wait(1100);
+    coin.classList.remove("fly");
+
+    // 6. Update balances
+    balLeft -= amount; balRight += amount;
+    const bl = document.getElementById("balLeft"), br = document.getElementById("balRight");
+    bl.textContent = euro(balLeft); br.textContent = euro(balRight);
+    bl.classList.add("flash-down"); br.classList.add("flash-up");
+
+    document.getElementById("statusLeft").className = "status success";
+    document.getElementById("statusLeft").textContent = "✅ " + euro(amount) + " verstuurd!";
+    document.getElementById("statusRight").className = "status success";
+    document.getElementById("statusRight").textContent = "✅ " + euro(amount) + " ontvangen!";
+
+    await wait(500);
+    document.getElementById("phoneLeft").classList.remove("glow");
+    document.getElementById("phoneRight").classList.remove("glow");
+    busy = false;
+  }
+
+  function resetDemo() {
+    busy = false;
+    balLeft = left; balRight = right;
+    document.getElementById("balLeft").textContent = euro(left);
+    document.getElementById("balRight").textContent = euro(right);
+    document.getElementById("balLeft").className = "balance-amount";
+    document.getElementById("balRight").className = "balance-amount";
+    document.getElementById("stage").classList.remove("tapped");
+    document.getElementById("nfc").classList.remove("active");
+    ["phoneLeft","phoneRight"].forEach(id => document.getElementById(id).classList.remove("glow"));
+    document.getElementById("statusLeft").className = "status";
+    document.getElementById("statusLeft").textContent = "Vul een bedrag in en tik de telefoons tegen elkaar";
+    document.getElementById("statusRight").className = "status";
+    document.getElementById("statusRight").textContent = "Wachten op een tik…";
+    document.getElementById("tapBtn").disabled = false;
+    ["s1","s2","s3","s4"].forEach(s => setStep(s, false));
+  }
+</script>
+</body>
+</html>
