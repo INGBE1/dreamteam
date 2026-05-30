@@ -183,6 +183,64 @@
   .explain .blue { color: #6fa8ff; }
   .explain .step { opacity: .35; transition: opacity .4s; }
   .explain .step.on { opacity: 1; }
+
+  /* ===== UNDO COUNTDOWN OVERLAY ===== */
+  .undo-modal {
+    position: fixed; inset: 0; background: rgba(8,8,20,.92); display: flex;
+    align-items: center; justify-content: center; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity .35s; z-index: 100;
+  }
+  .undo-modal.show { opacity: 1; pointer-events: auto; }
+
+  .undo-box {
+    background: #ffffff0d; border: 1px solid #ffffff2a;
+    border-radius: 24px; padding: 40px 30px; text-align: center;
+    max-width: 420px; backdrop-filter: blur(8px);
+  }
+
+  .undo-ring {
+    position: relative; width: 180px; height: 180px; margin: 0 auto 20px;
+  }
+  .undo-ring svg { transform: rotate(-90deg); }
+  .undo-ring .undo-num {
+    position: absolute; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+  }
+  .undo-ring .undo-num b {
+    font-size: 64px; font-weight: 800; color: #fff; line-height: 1;
+  }
+  .undo-ring .undo-num small {
+    font-size: 12px; color: #9aa5c4; text-transform: uppercase;
+    letter-spacing: .1em; margin-top: 6px;
+  }
+
+  .undo-title {
+    font-size: 20px; font-weight: 700; color: #fff; margin: 14px 0 8px;
+  }
+  .undo-sub {
+    font-size: 13px; color: #c8d0e8; line-height: 1.6; margin-bottom: 28px;
+  }
+
+  .undo-buttons { display: flex; gap: 12px; }
+  .undo-buttons button {
+    flex: 1; padding: 14px; border: none; border-radius: 12px;
+    font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+    transition: transform .15s;
+  }
+  .undo-buttons button:active { transform: scale(.97); }
+
+  .undo-btn-cancel {
+    background: #ff6200; color: #fff; box-shadow: 0 8px 20px rgba(255,98,0,.4);
+  }
+  .undo-btn-confirm {
+    background: transparent; color: #ff6200; border: 2px solid #ff6200;
+  }
+
+  .pulse-num { animation: pulse-num 1s ease-in-out infinite; }
+  @keyframes pulse-num {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+  }
 </style>
 </head>
 <body>
@@ -245,6 +303,26 @@
     <button class="reset" onclick="resetDemo()">↺ Opnieuw</button>
   </div>
 
+  <!-- UNDO COUNTDOWN MODAL -->
+  <div class="undo-modal" id="undoModal">
+    <div class="undo-box">
+      <div class="undo-ring">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="80" fill="none" stroke="#ffffff22" stroke-width="12"/>
+          <circle id="undoProg" cx="90" cy="90" r="80" fill="none" stroke="#ff6200" stroke-width="12" stroke-linecap="round"
+                  stroke-dasharray="502.65" stroke-dashoffset="0"/>
+        </svg>
+        <div class="undo-num"><b id="undoCount">5</b><small>seconden</small></div>
+      </div>
+      <div class="undo-title">Betaling wordt verstuurd…</div>
+      <div class="undo-sub">Je hebt nog <strong>5 seconden</strong> om deze transactie ongedaan te maken.</div>
+      <div class="undo-buttons">
+        <button class="undo-btn-cancel" id="undoConfirmBtn">✓ Doorgaan</button>
+        <button class="undo-btn-confirm" id="undoCancelBtn">↩ Annuleren</button>
+      </div>
+    </div>
+  </div>
+
   <div class="explain">
     <div class="step" id="s1">1️⃣ Telefoons komen dichtbij → <b>NFC / QR</b> maakt verbinding.</div>
     <div class="step" id="s2">2️⃣ De ontvanger deelt enkel zijn <b>rekeningnummer (IBAN)</b> — géén geld.</div>
@@ -256,10 +334,79 @@
   let busy = false;
   const startLeft = 1250, startRight = 480;
   let balLeft = startLeft, balRight = startRight;
+  let undoTimer = null, undoTick = null, undoRemaining = 5;
+  const UNDO_DURATION = 5;
+  const UNDO_CIRC = 2 * Math.PI * 80;
 
   const euro = n => "€ " + n.toLocaleString("nl-BE", {minimumFractionDigits:2, maximumFractionDigits:2});
   const setStep = (id, on) => document.getElementById(id).classList.toggle("on", on);
   const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  function startUndoCountdown(amount) {
+    const modal = document.getElementById("undoModal");
+    const countEl = document.getElementById("undoCount");
+    const prog = document.getElementById("undoProg");
+    
+    modal.classList.add("show");
+    undoRemaining = UNDO_DURATION;
+    countEl.textContent = undoRemaining;
+    prog.style.transition = 'none';
+    prog.style.strokeDashoffset = '0';
+
+    requestAnimationFrame(() => {
+      prog.style.transition = `stroke-dashoffset ${UNDO_DURATION}s linear`;
+      prog.style.strokeDashoffset = UNDO_CIRC;
+    });
+
+    undoTick = setInterval(() => {
+      undoRemaining--;
+      if (undoRemaining >= 0) countEl.textContent = undoRemaining;
+      if (undoRemaining <= 1) countEl.classList.add("pulse-num");
+    }, 1000);
+
+    undoTimer = setTimeout(() => {
+      finishTransaction(amount, true);
+    }, UNDO_DURATION * 1000);
+  }
+
+  function clearUndoTimers() {
+    clearTimeout(undoTimer);
+    clearInterval(undoTick);
+    document.getElementById("undoCount").classList.remove("pulse-num");
+  }
+
+  function finishTransaction(amount, success) {
+    clearUndoTimers();
+    document.getElementById("undoModal").classList.remove("show");
+
+    if (success) {
+      // Process payment
+      balLeft -= amount;
+      balRight += amount;
+      const bl = document.getElementById("balLeft"), br = document.getElementById("balRight");
+      bl.textContent = euro(balLeft);
+      br.textContent = euro(balRight);
+      bl.classList.add("flash-down");
+      br.classList.add("flash-up");
+
+      document.getElementById("statusLeft").className = "status success";
+      document.getElementById("statusLeft").textContent = "✅ " + euro(amount) + " verstuurd!";
+      document.getElementById("statusRight").className = "status success";
+      document.getElementById("statusRight").textContent = "✅ " + euro(amount) + " ontvangen!";
+    } else {
+      // Cancelled
+      document.getElementById("statusLeft").className = "status";
+      document.getElementById("statusLeft").textContent = "❌ Betaling geannuleerd";
+      document.getElementById("statusRight").className = "status";
+      document.getElementById("statusRight").textContent = "Transactie geannuleerd";
+    }
+
+    setTimeout(() => {
+      document.getElementById("phoneLeft").classList.remove("glow");
+      document.getElementById("phoneRight").classList.remove("glow");
+      busy = false;
+    }, 400);
+  }
 
   async function tap() {
     if (busy) return;
@@ -300,7 +447,7 @@
     await wait(500);
     fi.classList.add("scanning");
     fiStatus.textContent = "Gezicht scannen…";
-    await wait(2000);                       // scanning animation
+    await wait(2000);
     fi.classList.remove("scanning");
     fi.classList.add("done");
     fiStatus.textContent = "Gezicht herkend ✓";
@@ -308,35 +455,18 @@
     await wait(1100);
     fi.classList.remove("show", "done");
 
-    // 5. ING processes — coin flies
+    // 5. ===== UNDO COUNTDOWN =====
     setStep("s4", true);
     document.getElementById("statusLeft").className = "status";
-    document.getElementById("statusLeft").textContent = "🏦 ING verwerkt de overschrijving…";
-    const coin = document.getElementById("coin");
-    coin.classList.add("fly");
-    await wait(1100);
-    coin.classList.remove("fly");
-
-    // 6. Update balances
-    balLeft -= amount; balRight += amount;
-    const bl = document.getElementById("balLeft"), br = document.getElementById("balRight");
-    bl.textContent = euro(balLeft); br.textContent = euro(balRight);
-    bl.classList.add("flash-down"); br.classList.add("flash-up");
-
-    document.getElementById("statusLeft").className = "status success";
-    document.getElementById("statusLeft").textContent = "✅ " + euro(amount) + " verstuurd!";
-    document.getElementById("statusRight").className = "status success";
-    document.getElementById("statusRight").textContent = "✅ " + euro(amount) + " ontvangen!";
-
-    await wait(400);
-    document.getElementById("phoneLeft").classList.remove("glow");
-    document.getElementById("phoneRight").classList.remove("glow");
-    busy = false;
+    document.getElementById("statusLeft").textContent = "⏳ Wachten op bevestiging…";
+    startUndoCountdown(amount);
   }
 
   function resetDemo() {
+    clearUndoTimers();
     busy = false;
-    balLeft = startLeft; balRight = startRight;
+    balLeft = startLeft;
+    balRight = startRight;
     document.getElementById("balLeft").textContent = euro(startLeft);
     document.getElementById("balRight").textContent = euro(startRight);
     document.getElementById("balLeft").className = "balance-amount";
@@ -352,9 +482,19 @@
     document.getElementById("statusLeft").textContent = "Vul een bedrag in en tik de telefoons tegen elkaar";
     document.getElementById("statusRight").className = "status";
     document.getElementById("statusRight").textContent = "Wachten op een tik…";
+    document.getElementById("undoModal").classList.remove("show");
     document.getElementById("tapBtn").disabled = false;
     ["s1","s2","s3","s4"].forEach(s => setStep(s, false));
   }
+
+  // Undo modal buttons
+  document.getElementById("undoConfirmBtn").addEventListener("click", () => {
+    finishTransaction(parseFloat(document.getElementById("amount").value), true);
+  });
+
+  document.getElementById("undoCancelBtn").addEventListener("click", () => {
+    finishTransaction(parseFloat(document.getElementById("amount").value), false);
+  });
 </script>
 </body>
 </html>

@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TapPay — Combined Demo with Offline Support</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px 60px;
+      overflow-x: hidden;
+    }
+    h1 { font-size: 28px; margin-bottom: 4px; letter-spacing: -0.5px; }
+    h1 .orange { color: #ff6200; }
+    .subtitle { color: #9aa5c4; font-size: 15px; margin-bottom: 28px; text-align: center; }
+
+    .stage {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 80px;
+      transition: gap 0.9s cubic-bezier(.6,-0.2,.3,1.4);
+      margin-bottom: 10px;
+    }
+    .stage.tapped { gap: 6px; }
+
+    .phone {
+      width: 230px;
+      height: 480px;
+      background: #0d0d18;
+      border-radius: 34px;
+      border: 6px solid #2b2f45;
+      padding: 16px 14px;
+      position: relative;
+      box-shadow: 0 25px 50px rgba(0,0,0,.5);
+      transition: transform 0.9s cubic-bezier(.6,-0.2,.3,1.4), box-shadow .4s;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .stage.tapped .phone.left  { transform: translateX(14px) rotate(-1.5deg); }
+    .stage.tapped .phone.right { transform: translateX(-14px) rotate(1.5deg); }
+    .phone.glow { box-shadow: 0 0 0 3px #ff6200, 0 0 40px #ff6200aa, 0 25px 50px rgba(0,0,0,.5); }
+
+    .notch { width: 90px; height: 18px; background: #2b2f45; border-radius: 0 0 12px 12px; margin: -16px auto 12px; }
+    .os-tag {
+      position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+      font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px;
+      background: #2b2f45; color: #9aa5c4; white-space: nowrap;
+    }
+
+    .tap-zone {
+      position: absolute; top: 0; left: 0; right: 0; height: 80px;
+      cursor: pointer; z-index: 15; border-radius: 28px 28px 0 0;
+      background: linear-gradient(180deg, rgba(255,98,0,0) 0%, transparent 100%);
+      transition: background .3s;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 24px; font-weight: 700; opacity: 0;
+    }
+    .phone:hover .tap-zone { opacity: 1; background: linear-gradient(180deg, rgba(255,98,0,.15) 0%, transparent 100%); }
+    .tap-zone-label { font-size: 12px; position: absolute; bottom: 8px; opacity: 0; transition: opacity .3s; }
+    .phone:hover .tap-zone-label { opacity: 1; }
+
+    .screen-title { font-size: 13px; color: #9aa5c4; margin-bottom: 2px; }
+    .name { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+    .iban { font-size: 11px; color: #6b7494; font-family: monospace; margin-bottom: 18px; }
+
+    .balance-box {
+      background: linear-gradient(135deg, #ff6200, #ff8534);
+      border-radius: 16px; padding: 14px; margin-bottom: 16px;
+    }
+    .balance-label { font-size: 11px; opacity: .9; }
+    .balance-amount { font-size: 26px; font-weight: 800; transition: color .3s; }
+    .balance-amount.flash-up { color: #d4ffd4; }
+    .balance-amount.flash-down { color: #ffe0e0; }
+
+    .amount-input {
+      width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #2b2f45;
+      background: #15162a; color: #fff; font-size: 22px; font-weight: 700; text-align: center;
+      margin-bottom: 12px;
+    }
+    .amount-input:focus { outline: none; border-color: #ff6200; }
+
+    .status {
+      margin-top: auto; font-size: 13px; text-align: center; min-height: 40px;
+      display: flex; align-items: center; justify-content: center; padding: 8px;
+      border-radius: 12px; background: #15162a; color: #9aa5c4;
+      transition: all .3s;
+    }
+    .status.success { background: #103a1e; color: #6effa0; font-weight: 700; }
+    .status.receiving { background: #3a2e10; color: #ffd56e; }
+    .status.cancelled { background: #3a1010; color: #ff9999; font-weight: 700; }
+
+    /* FACE ID OVERLAY */
+    .faceid {
+      position: absolute; inset: 0; background: rgba(8,8,20,.96);
+      border-radius: 28px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px;
+      opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 20;
+    }
+    .faceid.show { opacity: 1; }
+    .faceid .fi-title { font-size: 14px; color: #c8d0e8; }
+    .faceid .fi-amount { font-size: 22px; font-weight: 800; color: #fff; }
+    .faceid .fi-to { font-size: 12px; color: #9aa5c4; margin-top: -10px; }
+
+    .face-circle {
+      width: 130px; height: 130px; border-radius: 50%;
+      border: 3px solid #2b6fff; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle, #14213f 0%, #0d0d18 100%);
+      transition: border-color .4s, transform .4s;
+    }
+    .face-circle .face-emoji { font-size: 64px; filter: grayscale(.3); }
+    .scan-line {
+      position: absolute; left: 8%; width: 84%; height: 3px;
+      background: linear-gradient(90deg, transparent, #2b6fff, transparent);
+      box-shadow: 0 0 12px #2b6fff; top: 10%; opacity: 0;
+    }
+    .faceid.scanning .scan-line { opacity: 1; animation: scan 1s ease-in-out infinite; }
+    @keyframes scan {
+      0%   { top: 12%; }
+      50%  { top: 84%; }
+      100% { top: 12%; }
+    }
+    .face-dots {
+      position: absolute; inset: 0; border-radius: 50%; opacity: 0;
+      background-image: radial-gradient(#2b6fff55 1px, transparent 1px);
+      background-size: 12px 12px; transition: opacity .3s;
+    }
+    .faceid.scanning .face-dots { opacity: 1; }
+
+    .faceid.done .face-circle { border-color: #2ecc71; transform: scale(1.05); }
+    .faceid.done .face-emoji { filter: none; }
+    .fi-check { font-size: 0; transition: font-size .3s; color: #2ecc71; font-weight: 800; }
+    .faceid.done .fi-check { font-size: 16px; }
+
+    /* NFC WAVES */
+    .nfc-zone {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 120px; height: 120px; pointer-events: none; opacity: 0; transition: opacity .3s;
+    }
+    .nfc-zone.active { opacity: 1; }
+    .wave {
+      position: absolute; left: 50%; top: 50%; border: 3px solid #ff6200;
+      border-radius: 50%; transform: translate(-50%,-50%); animation: ripple 1.4s ease-out infinite;
+    }
+    .wave:nth-child(2) { animation-delay: .45s; }
+    .wave:nth-child(3) { animation-delay: .9s; }
+    @keyframes ripple {
+      0%   { width: 10px; height: 10px; opacity: 1; }
+      100% { width: 130px; height: 130px; opacity: 0; }
+    }
+
+    /* UNDO COUNTDOWN MODAL */
+    .undo-modal {
+      position: fixed; inset: 0; background: rgba(8,8,20,.92); display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity .35s; z-index: 100;
+    }
+    .undo-modal.show { opacity: 1; pointer-events: auto; }
+
+    .undo-box {
+      background: #ffffff0d; border: 1px solid #ffffff2a;
+      border-radius: 24px; padding: 40px 30px; text-align: center;
+      max-width: 420px; backdrop-filter: blur(8px);
+    }
+
+    .undo-ring {
+      position: relative; width: 180px; height: 180px; margin: 0 auto 20px;
+    }
+    .undo-ring svg { transform: rotate(-90deg); }
+    .undo-ring .undo-num {
+      position: absolute; inset: 0; display: flex;
+      flex-direction: column; align-items: center; justify-content: center;
+    }
+    .undo-ring .undo-num b {
+      font-size: 64px; font-weight: 800; color: #fff; line-height: 1;
+    }
+    .undo-ring .undo-num small {
+      font-size: 12px; color: #9aa5c4; text-transform: uppercase;
+      letter-spacing: .1em; margin-top: 6px;
+    }
+
+    .undo-title {
+      font-size: 20px; font-weight: 700; color: #fff; margin: 14px 0 8px;
+    }
+    .undo-sub {
+      font-size: 13px; color: #c8d0e8; line-height: 1.6; margin-bottom: 28px;
+    }
+
+    .undo-buttons { display: flex; gap: 12px; }
+    .undo-buttons button {
+      flex: 1; padding: 14px; border: none; border-radius: 12px;
+      font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+      transition: transform .15s;
+    }
+    .undo-buttons button:active { transform: scale(.97); }
+
+    .undo-btn-confirm {
+      background: #2ecc71; color: #0d0d18;
+    }
+    .undo-btn-cancel {
+      background: transparent; color: #ff6200; border: 2px solid #ff6200;
+    }
+
+    .pulse-num { animation: pulse-num 1s ease-in-out infinite; }
+    @keyframes pulse-num {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .5; }
+    }
+
+    /* PENDING TRANSACTION MODAL */
+    .pending-modal {
+      position: fixed; inset: 0; background: rgba(8,8,20,.92); display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+      opacity: 0; pointer-events: none; transition: opacity .35s; z-index: 110;
+    }
+    .pending-modal.show { opacity: 1; pointer-events: auto; }
+
+    .pending-box {
+      background: #ffffff0d; border: 1px solid #ffffff2a;
+      border-radius: 24px; padding: 40px 30px; text-align: center;
+      max-width: 420px; backdrop-filter: blur(8px);
+    }
+
+    .pending-spinner {
+      width: 50px; height: 50px; border: 4px solid #ff8534; border-top: 4px solid transparent;
+      border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .pending-title { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+    .pending-msg { font-size: 14px; color: #c8d0e8; line-height: 1.6; margin-bottom: 16px; }
+    .pending-status { font-size: 12px; color: #ff8534; font-weight: 600; }
+
+    /* WiFi Indicator */
+    .wifi-indicator {
+      position: fixed; top: 20px; right: 20px; z-index: 200;
+      display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+      padding: 8px 16px; border-radius: 20px; transition: all .3s;
+    }
+    .wifi-indicator.online {
+      background: rgba(46, 204, 113, .2); color: #6effa0; border: 1px solid #6effa0;
+    }
+    .wifi-indicator.offline {
+      background: rgba(255, 98, 0, .2); color: #ff8534; border: 1px solid #ff8534; animation: pulse-wifi 1s ease-in-out infinite;
+    }
+    .wifi-icon { font-size: 14px; }
+    @keyframes pulse-wifi {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .6; }
+    }
+
+    .controls { margin-top: 40px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    button.action {
+      background: #ff6200; color: #fff; border: none; padding: 16px 34px;
+      border-radius: 14px; font-size: 17px; font-weight: 700; cursor: pointer;
+      transition: transform .15s, background .2s; box-shadow: 0 8px 20px rgba(255,98,0,.4);
+    }
+    button.action:hover:not(:disabled) { transform: translateY(-2px); background: #ff7a26; }
+    button.action:disabled { background: #3a3f55; box-shadow: none; cursor: not-allowed; }
+    button.reset {
+      background: transparent; color: #9aa5c4; border: 2px solid #2b2f45;
+      padding: 16px 24px; border-radius: 14px; font-size: 15px; cursor: pointer;
+    }
+    button.reset:hover { border-color: #9aa5c4; color: #fff; }
+
+    .explain {
+      margin-top: 34px; max-width: 580px; background: #ffffff0d; border: 1px solid #ffffff1a;
+      border-radius: 16px; padding: 18px 22px; font-size: 14px; line-height: 1.7; color: #c8d0e8;
+    }
+    .explain b { color: #ff8534; }
+    .explain .blue { color: #6fa8ff; }
+    .explain .green { color: #6effa0; }
+    .explain .step { opacity: .35; transition: opacity .4s; }
+    .explain .step.on { opacity: 1; }
+  </style>
+</head>
+<body>
+  <!-- WiFi Indicator -->
+  <div class="wifi-indicator online" id="wifiIndicator">
+    <span class="wifi-icon">📡</span>
+    <span id="wifiText">Online</span>
+  </div>
+
+  <h1><span class="orange">ING</span> TapPay <span style="font-size:18px">📲💸🔐</span></h1>
+  <p class="subtitle">Full demo — two phones, NFC connection, Face ID approval, and 10 seconds to undo. Offline mode: queued transactions</p>
+
+  <div class="stage" id="stage">
+    <!-- Sender -->
+    <div class="phone left" id="phoneLeft">
+      <span class="os-tag">📱 iPhone — Sender</span>
+      <div class="tap-zone" onclick="tap()">
+        <span class="tap-zone-label">Tap here</span>
+      </div>
+      <div class="notch"></div>
+      <div class="screen-title">ING TapPay</div>
+      <div class="name">Arpit</div>
+      <div class="iban">NL91 ABNA 0417 1643 00</div>
+      <div class="balance-box">
+        <div class="balance-label">Balance</div>
+        <div class="balance-amount" id="balLeft">€ 1.250,00</div>
+      </div>
+      <input class="amount-input" id="amount" type="number" value="25" min="1">
+      <div class="status" id="statusLeft">Enter an amount and tap</div>
+
+      <!-- Face ID overlay -->
+      <div class="faceid" id="faceid">
+        <div class="fi-title">Confirm with Face ID</div>
+        <div class="fi-amount" id="fiAmount">€ 25,00</div>
+        <div class="fi-to">to Sofie</div>
+        <div class="face-circle">
+          <div class="face-dots"></div>
+          <div class="scan-line"></div>
+          <div class="face-emoji">🙂</div>
+        </div>
+        <div class="fi-title" id="fiStatus">Look at your phone…</div>
+        <div class="fi-check">✓ Face recognized</div>
+      </div>
+    </div>
+
+    <div class="nfc-zone" id="nfc">
+      <div class="wave"></div><div class="wave"></div><div class="wave"></div>
+    </div>
+
+    <!-- Receiver -->
+    <div class="phone right" id="phoneRight">
+      <span class="os-tag">🤖 Android — Receiver</span>
+      <div class="tap-zone" onclick="tap()">
+        <span class="tap-zone-label">Tap here</span>
+      </div>
+      <div class="notch"></div>
+      <div class="screen-title">ING TapPay</div>
+      <div class="name">Sofie</div>
+      <div class="iban">NL71 ABNA 2345 6769 00</div>
+      <div class="balance-box">
+        <div class="balance-label">Balance</div>
+        <div class="balance-amount" id="balRight">€ 480,00</div>
+      </div>
+      <div style="font-size:11px;color:#6b7494;margin-bottom:18px">Ready to receive…</div>
+      <div class="status" id="statusRight">Waiting for tap…</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="action" id="tapBtn" onclick="tap()">👉 Tap phones together</button>
+    <button class="action" id="voiceBtn" onclick="startVoiceCommand()">🎙 Voice command</button>
+    <button class="reset" onclick="resetDemo()">↺ Reset</button>
+  </div>
+
+  <!-- TRANSACTION PENDING MODAL (Waiting for WiFi) -->
+  <div class="pending-modal" id="pendingModal">
+    <div class="pending-box">
+      <div class="pending-spinner"></div>
+      <div class="pending-title">Transaction Pending</div>
+      <div class="pending-msg">Your payment of <strong id="pendingAmount">€ 25,00</strong> is queued.<br>Waiting for internet connection to finalize...</div>
+      <div class="pending-status" id="pendingStatus">📡 No WiFi connection</div>
+    </div>
+  </div>
+
+  <!-- UNDO COUNTDOWN MODAL -->
+  <div class="undo-modal" id="undoModal">
+    <div class="undo-box">
+      <div class="undo-ring">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="80" fill="none" stroke="#ffffff22" stroke-width="12"/>
+          <circle id="undoProg" cx="90" cy="90" r="80" fill="none" stroke="#ff6200" stroke-width="12" stroke-linecap="round"
+                  stroke-dasharray="502.65" stroke-dashoffset="0"/>
+        </svg>
+        <div class="undo-num"><b id="undoCount">10</b><small>seconds</small></div>
+      </div>
+      <div class="undo-title">Payment is being sent…</div>
+      <div class="undo-sub">You have <strong id="undoCountText">10 seconds</strong> to undo this transaction.</div>
+      <div class="undo-buttons">
+        <button class="undo-btn-confirm" id="undoConfirmBtn">✓ Continue</button>
+        <button class="undo-btn-cancel" id="undoCancelBtn">↩ Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="explain">
+    <div class="step" id="s1">1️⃣ Phones tap together → <b>NFC connection</b> established</div>
+    <div class="step" id="s2">2️⃣ IBAN is shared → <b>no money is transferred yet</b></div>
+    <div class="step" id="s3">3️⃣ Sender approves with <span class="blue">Face ID</span> 🔐 → face verification required</div>
+    <div class="step" id="s4">4️⃣ <span class="green">⏱️ 10 seconds</span> to <b>undo</b> → <span class="orange">offline-first</span>: queued until online ✅</div>
+  </div>
+
+<script>
+  let busy = false;
+  const startLeft = 1250, startRight = 480;
+  let balLeft = startLeft, balRight = startRight;
+  let undoTimer = null, undoTick = null, undoRemaining = 10;
+  const UNDO_DURATION = 10;
+  const UNDO_CIRC = 2 * Math.PI * 80;
+  let recognition = null;
+  let voiceActive = false;
+  let pendingTransaction = null;
+  let isOnline = navigator.onLine;
+
+  const euro = n => "€ " + n.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const setStep = (id, on) => document.getElementById(id).classList.toggle("on", on);
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function updateWiFiIndicator() {
+    const indicator = document.getElementById('wifiIndicator');
+    const text = document.getElementById('wifiText');
+    indicator.className = 'wifi-indicator ' + (isOnline ? 'online' : 'offline');
+    text.textContent = isOnline ? 'Online' : 'No WiFi';
+    if (pendingTransaction && isOnline) {
+      finalizePendingTransaction();
+    }
+  }
+
+  window.addEventListener('online', () => {
+    isOnline = true;
+    updateWiFiIndicator();
+    speak('Internet connection restored.');
+  });
+
+  window.addEventListener('offline', () => {
+    isOnline = false;
+    updateWiFiIndicator();
+    speak('Lost internet connection.');
+  });
+
+  function finalizePendingTransaction() {
+    if (!pendingTransaction) return;
+    const amount = pendingTransaction.amount;
+    clearUndoTimers();
+    document.getElementById('undoModal').classList.remove('show');
+    document.getElementById('pendingModal').classList.remove('show');
+    balLeft -= amount;
+    balRight += amount;
+    const bl = document.getElementById('balLeft'), br = document.getElementById('balRight');
+    bl.textContent = euro(balLeft);
+    br.textContent = euro(balRight);
+    bl.classList.add('flash-down');
+    br.classList.add('flash-up');
+    document.getElementById('statusLeft').className = 'status success';
+    document.getElementById('statusLeft').textContent = '✅ ' + euro(amount) + ' sent!';
+    document.getElementById('statusRight').className = 'status success';
+    document.getElementById('statusRight').textContent = '✅ ' + euro(amount) + ' received!';
+    speak('Payment sent. Internet connection available.');
+    pendingTransaction = null;
+    setTimeout(() => {
+      document.getElementById('phoneLeft').classList.remove('glow');
+      document.getElementById('phoneRight').classList.remove('glow');
+      busy = false;
+    }, 400);
+  }
+
+  function supportedRecognition() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  function startRecognition() {
+    if (!supportedRecognition()) {
+      alert('Voice commands are not supported in this browser.');
+      return Promise.reject('SpeechRecognition not supported');
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    return new Promise((resolve, reject) => {
+      recognition.onresult = event => {
+        const transcript = event.results[0][0].transcript.toLowerCase().trim();
+        resolve(transcript);
+      };
+      recognition.onerror = event => reject(event.error || 'recognition error');
+      recognition.onend = () => {
+        if (voiceActive) voiceActive = false;
+      };
+      recognition.start();
+    });
+  }
+
+  function parseAmount(text) {
+    const digits = text.match(/(\d+([.,]\d+)?)/);
+    if (digits) return parseFloat(digits[0].replace(',', '.'));
+    const words = text.replace(/[^a-z\s]/g, '').split(/\s+/);
+    const lookup = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+    let value = 0;
+    words.forEach(word => {
+      if (lookup[word] !== undefined) value += lookup[word];
+    });
+    return value || null;
+  }
+
+  async function handleVoiceCommand(transcript) {
+    if (!transcript) return;
+    const amount = parseAmount(transcript);
+    const yesNo = /\b(yes|yeah|yep|confirm|sure)\b/.test(transcript);
+    const no = /\b(no|cancel|stop|nevermind|nope)\b/.test(transcript);
+    const send = /\b(send|pay|transfer|start|go)\b/.test(transcript);
+
+    if (undoTimer && document.getElementById('undoModal').classList.contains('show')) {
+      if (yesNo) {
+        speak('Confirmed. Sending payment now.');
+        finishTransaction(parseFloat(document.getElementById('amount').value), true);
+        return;
+      }
+      if (no) {
+        speak('Payment cancelled.');
+        finishTransaction(parseFloat(document.getElementById('amount').value), false);
+        return;
+      }
+      speak('Please say yes to continue or no to cancel.');
+      return;
+    }
+
+    if (amount) {
+      document.getElementById('amount').value = amount;
+      document.getElementById('statusLeft').textContent = 'Amount set to ' + euro(amount) + '. Say send when ready.';
+      speak('Amount set to ' + amount + ' euros. Say send when ready.');
+    }
+
+    if (send) {
+      speak('Starting the transfer flow.');
+      tap();
+      return;
+    }
+
+    if (!amount && !send) {
+      speak('I did not understand. Say amount in euros or say send to start.');
+    }
+  }
+
+  async function startVoiceCommand() {
+    if (voiceActive) return;
+    voiceActive = true;
+    speak('Listening for voice command.');
+    try {
+      const transcript = await startRecognition();
+      speak('You said: ' + transcript);
+      await handleVoiceCommand(transcript);
+    } catch (err) {
+      speak('Voice recognition failed. Please try again.');
+      console.error(err);
+    }
+  }
+
+  function startUndoCountdown(amount) {
+    const modal = document.getElementById("undoModal");
+    const countEl = document.getElementById("undoCount");
+    const prog = document.getElementById("undoProg");
+    
+    modal.classList.add("show");
+    undoRemaining = UNDO_DURATION;
+    countEl.textContent = undoRemaining;
+    prog.style.transition = 'none';
+    prog.style.strokeDashoffset = '0';
+
+    requestAnimationFrame(() => {
+      prog.style.transition = `stroke-dashoffset ${UNDO_DURATION}s linear`;
+      prog.style.strokeDashoffset = UNDO_CIRC;
+    });
+
+    speak('Are you sure you want to send ' + amount + ' euros? Say yes to confirm or no to cancel.');
+
+    undoTick = setInterval(() => {
+      undoRemaining--;
+      if (undoRemaining >= 0) countEl.textContent = undoRemaining;
+      if (undoRemaining <= 1) countEl.classList.add("pulse-num");
+    }, 1000);
+
+    undoTimer = setTimeout(() => {
+      finishTransaction(amount, true);
+    }, UNDO_DURATION * 1000);
+  }
+
+  function clearUndoTimers() {
+    clearTimeout(undoTimer);
+    clearInterval(undoTick);
+    document.getElementById("undoCount").classList.remove("pulse-num");
+  }
+
+  function finishTransaction(amount, success) {
+    clearUndoTimers();
+    document.getElementById("undoModal").classList.remove("show");
+
+    if (!success) {
+      document.getElementById("statusLeft").className = "status cancelled";
+      document.getElementById("statusLeft").textContent = "❌ Payment cancelled";
+      document.getElementById("statusRight").className = "status cancelled";
+      document.getElementById("statusRight").textContent = "⏸ Transaction cancelled";
+      speak('Payment cancelled.');
+      pendingTransaction = null;
+      setTimeout(() => {
+        document.getElementById("phoneLeft").classList.remove("glow");
+        document.getElementById("phoneRight").classList.remove("glow");
+        busy = false;
+      }, 400);
+      return;
+    }
+
+    if (isOnline) {
+      balLeft -= amount;
+      balRight += amount;
+      const bl = document.getElementById("balLeft"), br = document.getElementById("balRight");
+      bl.textContent = euro(balLeft);
+      br.textContent = euro(balRight);
+      bl.classList.add("flash-down");
+      br.classList.add("flash-up");
+      document.getElementById("statusLeft").className = "status success";
+      document.getElementById("statusLeft").textContent = "✅ " + euro(amount) + " sent!";
+      document.getElementById("statusRight").className = "status success";
+      document.getElementById("statusRight").textContent = "✅ " + euro(amount) + " received!";
+      speak('Payment sent.');
+      pendingTransaction = null;
+      setTimeout(() => {
+        document.getElementById("phoneLeft").classList.remove("glow");
+        document.getElementById("phoneRight").classList.remove("glow");
+        busy = false;
+      }, 400);
+    } else {
+      pendingTransaction = { amount: amount };
+      document.getElementById('pendingAmount').textContent = euro(amount);
+      document.getElementById('pendingStatus').textContent = '📡 No WiFi connection. Waiting...';
+      document.getElementById('pendingModal').classList.add('show');
+      document.getElementById('statusLeft').textContent = '⏳ Queued - waiting for WiFi...';
+      speak('No WiFi connection. Payment queued. Waiting for internet.');
+    }
+  }
+
+  async function tap() {
+    if (busy) return;
+    const amount = parseFloat(document.getElementById("amount").value);
+    if (!amount || amount <= 0) { alert("Enter a valid amount 🙂"); return; }
+    if (amount > balLeft) { alert("Not enough balance 😅"); return; }
+    busy = true;
+    document.getElementById("tapBtn").disabled = true;
+    ["s1","s2","s3","s4"].forEach(s => setStep(s, false));
+
+    document.getElementById("stage").classList.add("tapped");
+    document.getElementById("phoneLeft").classList.add("glow");
+    document.getElementById("phoneRight").classList.add("glow");
+    await wait(600);
+
+    document.getElementById("nfc").classList.add("active");
+    setStep("s1", true);
+    document.getElementById("statusLeft").textContent = "🔗 NFC connection…";
+    document.getElementById("statusRight").className = "status receiving";
+    document.getElementById("statusRight").textContent = "🔗 Phone detected…";
+    await wait(1100);
+
+    setStep("s2", true);
+    document.getElementById("statusLeft").textContent = "📥 IBAN received";
+    document.getElementById("statusRight").textContent = "📤 IBAN shared (no money!)";
+    await wait(1200);
+
+    setStep("s3", true);
+    document.getElementById("nfc").classList.remove("active");
+    document.getElementById("fiAmount").textContent = euro(amount);
+    const fi = document.getElementById("faceid");
+    const fiStatus = document.getElementById("fiStatus");
+    fi.classList.add("show");
+    await wait(500);
+    fi.classList.add("scanning");
+    fiStatus.textContent = "Scanning face…";
+    await wait(2000);
+    fi.classList.remove("scanning");
+    fi.classList.add("done");
+    fiStatus.textContent = "Face recognized ✓";
+    document.querySelector(".face-emoji").textContent = "😊";
+    await wait(1100);
+    fi.classList.remove("show", "done");
+
+    setStep("s4", true);
+    document.getElementById("statusLeft").className = "status";
+    document.getElementById("statusLeft").textContent = "⏳ Waiting for confirmation…";
+    startUndoCountdown(amount);
+  }
+
+  function resetDemo() {
+    clearUndoTimers();
+    busy = false;
+    balLeft = startLeft;
+    balRight = startRight;
+    document.getElementById("balLeft").textContent = euro(startLeft);
+    document.getElementById("balRight").textContent = euro(startRight);
+    document.getElementById("balLeft").className = "balance-amount";
+    document.getElementById("balRight").className = "balance-amount";
+    document.getElementById("stage").classList.remove("tapped");
+    document.getElementById("nfc").classList.remove("active");
+    const fi = document.getElementById("faceid");
+    fi.classList.remove("show","scanning","done");
+    document.querySelector(".face-emoji").textContent = "🙂";
+    document.getElementById("fiStatus").textContent = "Look at your phone…";
+    ["phoneLeft","phoneRight"].forEach(id => document.getElementById(id).classList.remove("glow"));
+    document.getElementById("statusLeft").className = "status";
+    document.getElementById("statusLeft").textContent = "Enter an amount and tap";
+    document.getElementById("statusRight").className = "status";
+    document.getElementById("statusRight").textContent = "Waiting for tap…";
+    document.getElementById("undoModal").classList.remove("show");
+    document.getElementById("pendingModal").classList.remove("show");
+    document.getElementById("tapBtn").disabled = false;
+    pendingTransaction = null;
+    ["s1","s2","s3","s4"].forEach(s => setStep(s, false));
+  }
+
+  document.getElementById("undoConfirmBtn").addEventListener("click", () => {
+    finishTransaction(parseFloat(document.getElementById("amount").value), true);
+  });
+
+  document.getElementById("undoCancelBtn").addEventListener("click", () => {
+    finishTransaction(parseFloat(document.getElementById("amount").value), false);
+  });
+
+  // Initialize
+  updateWiFiIndicator();
+</script>
+</body>
+</html>
