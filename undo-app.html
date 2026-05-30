@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TapPay — Demo App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Spline+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ing: #ff6200;
+      --ing-dark: #cc4e00;
+      --ink: #1a1410;
+      --paper: #fff7f0;
+      --green: #1aa06d;
+      --red: #e23b3b;
+      --muted: #8a7f76;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Spline Sans', sans-serif;
+      background: radial-gradient(120% 80% at 50% -10%, #ffe2cc 0%, transparent 55%), #f3ece6;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--ink);
+    }
+    
+    .phone {
+      width: 340px;
+      height: 680px;
+      background: var(--paper);
+      border-radius: 42px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 30px 70px -20px rgba(120, 60, 0, 0.45), 0 0 0 10px #19120c, 0 0 0 12px #2a201a;
+    }
+    
+    .notch {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 110px;
+      height: 26px;
+      background: #19120c;
+      border-radius: 0 0 16px 16px;
+      z-index: 30;
+    }
+    
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Header */
+    .bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 22px 26px 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 30px 26px 8px;
+    }
+    
+    .lion {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--ing);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: 'Bricolage Grotesque';
+      font-weight: 800;
+      font-size: 17px;
+    }
+    
+    .brand b {
+      font-family: 'Bricolage Grotesque';
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -0.02em;
+    }
+    
+    .brand span {
+      color: var(--ing);
+    }
+    
+    /* Body */
+    .body {
+      flex: 1;
+      padding: 8px 26px 26px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .label {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    
+    .recipient {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.25);
+    }
+    
+    .avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffb37a, #ff6200);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 18px;
+      font-family: 'Bricolage Grotesque';
+    }
+    
+    .recipient .who {
+      font-weight: 600;
+      font-size: 16px;
+    }
+    
+    .recipient .iban {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    
+    .verified {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--green);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .amount {
+      text-align: center;
+      margin: auto 0;
+    }
+    
+    .amount .big {
+      font-family: 'Bricolage Grotesque';
+      font-weight: 800;
+      font-size: 64px;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    
+    .amount .big .cur {
+      font-size: 34px;
+      vertical-align: super;
+      color: var(--muted);
+    }
+    
+    .amount .desc {
+      margin-top: 10px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    
+    /* Button */
+    .btn {
+      border: none;
+      width: 100%;
+      padding: 18px;
+      border-radius: 18px;
+      font-family: 'Bricolage Grotesque';
+      font-weight: 700;
+      font-size: 17px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s;
+      color: #fff;
+      background: var(--ing);
+      box-shadow: 0 10px 24px -8px rgba(255, 98, 0, 0.6);
+    }
+    
+    .btn:active {
+      transform: scale(0.97);
+    }
+    
+    .btn.ghost {
+      background: #fff;
+      color: var(--ing);
+      box-shadow: inset 0 0 0 2px var(--ing);
+    }
+    
+    /* Overlay: Countdown */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(12px);
+      transition: opacity 0.35s, transform 0.35s;
+      z-index: 20;
+    }
+    
+    .overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: none;
+    }
+    
+    .ring {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      margin-bottom: 8px;
+    }
+    
+    .ring svg {
+      transform: rotate(-90deg);
+    }
+    
+    .ring .num {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .ring .num b {
+      font-family: 'Bricolage Grotesque';
+      font-weight: 800;
+      font-size: 74px;
+      line-height: 1;
+    }
+    
+    .ring .num small {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    
+    .ov-title {
+      font-family: 'Bricolage Grotesque';
+      font-weight: 700;
+      font-size: 22px;
+      text-align: center;
+      margin: 18px 0 6px;
+    }
+    
+    .ov-sub {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 30px;
+      line-height: 1.5;
+    }
+    
+    .ov-sub strong {
+      color: var(--ink);
+    }
+    
+    .undo {
+      width: 100%;
+      padding: 18px;
+      border-radius: 18px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Bricolage Grotesque';
+      font-weight: 700;
+      font-size: 17px;
+      background: #fff;
+      color: var(--red);
+      box-shadow: inset 0 0 0 2px var(--red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.15s;
+    }
+    
+    .undo:active {
+      transform: scale(0.97);
+    }
+    
+    /* Result Screens */
+    .result {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 25;
+      background: var(--paper);
+      transition: opacity 0.4s;
+    }
+    
+    .result.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    .icon {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      margin-bottom: 24px;
+      animation: pop 0.5s cubic-bezier(0.2, 1.4, 0.5, 1);
+    }
+    
+    .icon.ok {
+      background: rgba(26, 160, 109, 0.14);
+      color: var(--green);
+    }
+    
+    .icon.no {
+      background: rgba(226, 59, 59, 0.12);
+      color: var(--red);
+    }
+    
+    @keyframes pop {
+      from {
+        transform: scale(0.3);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    .result h2 {
+      font-family: 'Bricolage Grotesque';
+      font-weight: 800;
+      font-size: 26px;
+      text-align: center;
+    }
+    
+    .result p {
+      font-size: 14px;
+      color: var(--muted);
+      text-align: center;
+      margin: 10px 0 34px;
+      line-height: 1.5;
+    }
+    
+    .result p strong {
+      color: var(--ink);
+    }
+    
+    .pulse {
+      animation: pulse 1s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.55;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen">
+      <!-- Main Screen -->
+      <div class="bar"><span>9:41</span><span>TapPay</span></div>
+      <div class="brand"><div class="lion">T</div><b>Tap<span>Pay</span></b></div>
+
+      <div class="body">
+        <div class="label">Versturen naar</div>
+        <div class="recipient">
+          <div class="avatar">S</div>
+          <div>
+            <div class="who">Sara Janssens</div>
+            <div class="iban">NL•• •••• •••• 4417</div>
+          </div>
+          <div class="verified">✓ geverifieerd</div>
+        </div>
+
+        <div class="amount">
+          <div class="big"><span class="cur">€</span>20</div>
+          <div class="desc">🍕 Pizza-avond</div>
+        </div>
+
+        <button class="btn" id="sendBtn">Verstuur met Face ID</button>
+      </div>
+
+      <!-- Countdown Overlay -->
+      <div class="overlay" id="overlay">
+        <div class="ring">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="88" fill="none" stroke="#eee0d4" stroke-width="14"/>
+            <circle id="prog" cx="100" cy="100" r="88" fill="none" stroke="var(--ing)" stroke-width="14" stroke-linecap="round"
+                    stroke-dasharray="552.9" stroke-dashoffset="0"/>
+          </svg>
+          <div class="num"><b id="count">5</b><small>seconden</small></div>
+        </div>
+        <div class="ov-title">Onderweg naar Sara…</div>
+        <div class="ov-sub">Je kunt deze betaling van <strong>€20</strong> nog annuleren.<br>Daarna wordt ze definitief verstuurd.</div>
+        <button class="undo" id="undoBtn">↩ Ongedaan maken</button>
+      </div>
+
+      <!-- Success Screen -->
+      <div class="result" id="okScreen">
+        <div class="icon ok">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <h2>Verstuurd!</h2>
+        <p><strong>€20</strong> is naar Sara onderweg.<br>Ze ontvangt het binnen enkele seconden.</p>
+        <button class="btn ghost reset">Opnieuw proberen</button>
+      </div>
+
+      <!-- Cancelled Screen -->
+      <div class="result" id="noScreen">
+        <div class="icon no">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </div>
+        <h2>Geannuleerd</h2>
+        <p>Er is <strong>geen geld</strong> verstuurd.<br>Je betaling is op tijd ongedaan gemaakt.</p>
+        <button class="btn ghost reset">Opnieuw proberen</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DURATION = 5;
+    const CIRC = 2 * Math.PI * 88;
+    
+    const sendBtn = document.getElementById('sendBtn');
+    const overlay = document.getElementById('overlay');
+    const undoBtn = document.getElementById('undoBtn');
+    const countEl = document.getElementById('count');
+    const prog = document.getElementById('prog');
+    const okScreen = document.getElementById('okScreen');
+    const noScreen = document.getElementById('noScreen');
+
+    let timer = null, tick = null, remaining = DURATION;
+
+    function startCountdown() {
+      overlay.classList.add('show');
+      remaining = DURATION;
+      countEl.textContent = remaining;
+      prog.style.transition = 'none';
+      prog.style.strokeDashoffset = '0';
+
+      // Smooth ring depletion over duration
+      requestAnimationFrame(() => {
+        prog.style.transition = `stroke-dashoffset ${DURATION}s linear`;
+        prog.style.strokeDashoffset = CIRC;
+      });
+
+      // Count down each second
+      tick = setInterval(() => {
+        remaining--;
+        if (remaining >= 0) countEl.textContent = remaining;
+        if (remaining <= 1) countEl.classList.add('pulse');
+      }, 1000);
+
+      // Auto-send after 5 seconds
+      timer = setTimeout(() => finish(true), DURATION * 1000);
+    }
+
+    function clearTimers() {
+      clearTimeout(timer);
+      clearInterval(tick);
+      countEl.classList.remove('pulse');
+    }
+
+    function finish(success) {
+      clearTimers();
+      overlay.classList.remove('show');
+      (success ? okScreen : noScreen).classList.add('show');
+    }
+
+    sendBtn.addEventListener('click', startCountdown);
+    undoBtn.addEventListener('click', () => finish(false));
+    
+    document.querySelectorAll('.reset').forEach(b =>
+      b.addEventListener('click', () => {
+        okScreen.classList.remove('show');
+        noScreen.classList.remove('show');
+      })
+    );
+  </script>
+</body>
+</html>
